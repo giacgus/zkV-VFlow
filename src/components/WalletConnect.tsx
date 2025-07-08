@@ -1,0 +1,424 @@
+import React, { useState, useEffect } from 'react';
+import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
+import { web3FromAddress, web3Enable } from '@polkadot/extension-dapp';
+import { WalletService } from '../services/wallet';
+import './VFlowTeleport.css';
+import zkVerifyLogo from '../assets/zkverify_logo.png';
+import { ReactComponent as VFlowLogo } from '../assets/vflow_logo.svg';
+import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
+import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
+import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
+import chevronIcon from '../assets/chevron.png';
+import { ethers } from 'ethers';
+import { ApiPromise } from '@polkadot/api';
+
+const VFLOW_CONFIG = {
+  relayWsEndpoint: 'wss://volta-rpc.zkverify.io', // zkVerify Volta testnet RPC
+  parachainId: 1599, // Correct Parachain ID from the successful transaction
+};
+
+interface WalletState {
+  zkVerify: {
+    accounts: InjectedAccountWithMeta[];
+    account: InjectedAccountWithMeta | null;
+    balance: string;
+    isConnected: boolean;
+    error: string;
+  };
+  vflow: {
+    address: string;
+    isConnected: boolean;
+    error: string;
+  };
+}
+
+type ModalStatus = 'idle' | 'loading' | 'success' | 'error';
+
+const WalletConnect: React.FC = () => {
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalMessage, setModalMessage] = useState<React.ReactNode>('');
+  const [modalTxHash, setModalTxHash] = useState<string>('');
+  const [modalStatus, setModalStatus] = useState<ModalStatus>('idle');
+  const [amount, setAmount] = useState<string>('');
+  const [destinationAddress, setDestinationAddress] = useState<string>('');
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
+  const [isZkVerifyHelpOpen, setIsZkVerifyHelpOpen] = useState<boolean>(false);
+  const [walletState, setWalletState] = useState<WalletState>({
+    zkVerify: { accounts: [], account: null, balance: '0', isConnected: false, error: '' },
+    vflow: { address: '', isConnected: false, error: '' },
+  });
+
+  useEffect(() => {
+    web3Enable('zkV-VFlow Teleporter');
+    if ((window as any).ethereum) {
+      (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
+        if (walletState.vflow.isConnected && accounts.length > 0) {
+          setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, address: accounts[0] }}));
+          setDestinationAddress(accounts[0]);
+        } else if (accounts.length === 0) {
+          handleDisconnect('vflow');
+        }
+      });
+    }
+  }, [walletState.vflow.isConnected]);
+
+  useEffect(() => {
+    if (walletState.zkVerify.account) {
+      WalletService.getAccountBalance(walletState.zkVerify.account.address).then(balance => {
+        setWalletState(prev => ({
+          ...prev,
+          zkVerify: { ...prev.zkVerify, balance }
+        }));
+      });
+    }
+  }, [walletState.zkVerify.account]);
+
+
+  const formatBalance = (balance: string) => {
+    try {
+      const balanceBigInt = BigInt(balance);
+      const decimals = 18; // Correct decimals for tVFY
+      const integerPart = balanceBigInt / BigInt(10 ** decimals);
+      const fractionalPart = balanceBigInt % BigInt(10 ** decimals);
+      const fractionalString = fractionalPart.toString().padStart(decimals, '0').substring(0, 4);
+      return `${integerPart}.${fractionalString}`;
+    } catch (e) {
+      console.error("Could not format balance", e);
+      return "0.0000";
+    }
+  };
+
+  const connectToZkVerify = async () => {
+    setIsLoading(true);
+    try {
+      await WalletService.checkWalletInstalled();
+      const accounts = await WalletService.getAccounts();
+      if (accounts.length > 0) {
+        setWalletState(prev => ({
+          ...prev,
+          zkVerify: {
+            ...prev.zkVerify,
+            accounts: accounts,
+            account: accounts[0],
+            isConnected: true,
+            error: ''
+          }
+        }));
+      }
+    } catch (error: any) {
+      setWalletState(prev => ({ ...prev, zkVerify: { ...prev.zkVerify, error: error.message } }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const connectToVFlow = async () => {
+    const ethereum = (window as any).ethereum;
+    if (typeof ethereum === 'undefined') {
+      setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, error: 'MetaMask is not installed.' } }));
+      return;
+    }
+    try {
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      const address = accounts[0];
+      setWalletState(prev => ({
+        ...prev,
+        vflow: { address, isConnected: true, error: '' },
+      }));
+      setDestinationAddress(address);
+    } catch (error: any) {
+      setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, error: error.message } }));
+    }
+  };
+
+  const handleDisconnect = (walletType: 'zkVerify' | 'vflow') => {
+    if (walletType === 'zkVerify') {
+      WalletService.disconnect();
+      setWalletState(prev => ({
+        ...prev,
+        zkVerify: {
+          accounts: [],
+          account: null,
+          balance: '0',
+          isConnected: false,
+          error: '',
+        },
+      }));
+    } else {
+      setWalletState(prev => ({
+        ...prev,
+        vflow: { address: '', isConnected: false, error: '' },
+      }));
+      setDestinationAddress('');
+    }
+    setModalMessage('');
+    setModalTxHash('');
+    setModalStatus('idle');
+  };
+
+  const handleZkVerifyAccountChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedAddress = event.target.value;
+    const selectedAccount = walletState.zkVerify.accounts.find(acc => acc.address === selectedAddress);
+    if (selectedAccount) {
+      setWalletState(prev => ({
+        ...prev,
+        zkVerify: { ...prev.zkVerify, account: selectedAccount }
+      }));
+    }
+  };
+
+  const handleSetMaxAmount = () => {
+    const balance = walletState.zkVerify.balance;
+    const formattedBalance = ethers.formatUnits(balance, 18);
+    setAmount(formattedBalance);
+  };
+
+  const handleTeleport = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const { account } = walletState.zkVerify;
+    if (!account || !destinationAddress) {
+      setModalMessage('Please connect both wallets and enter an amount.');
+      setModalStatus('error');
+      setIsModalOpen(true);
+      return;
+    }
+
+    if (!ethers.isAddress(destinationAddress)) {
+      setModalMessage('Invalid destination address. Please enter a valid EVM address (0x...).');
+      setModalStatus('error');
+      setIsModalOpen(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setModalMessage('Preparing transaction...');
+    setModalStatus('loading');
+    setIsModalOpen(true);
+    setModalTxHash('');
+
+    let api: ApiPromise | null = null;
+    try {
+      setModalMessage('Connecting to zkVerify network...');
+      api = await WalletService.connectApi(VFLOW_CONFIG.relayWsEndpoint);
+      const connectedApi = api; // Create a non-null reference for use in the promise
+
+      const amountInPlanck = ethers.parseUnits(amount, 18); // Use 18 decimals
+
+      // Match the successful transaction's parameters
+      const destination = {
+        V5: {
+          parents: 0,
+          interior: { X1: [{ Parachain: VFLOW_CONFIG.parachainId }] },
+        }
+      };
+      const beneficiary = {
+        V5: {
+          parents: 0,
+          interior: { X1: [{ AccountKey20: { key: destinationAddress } }] },
+        }
+      };
+      const assets = {
+        V5: [
+          {
+            id: { Concrete: { parents: 0, interior: 'Here' } },
+            fun: { Fungible: amountInPlanck.toString() },
+          },
+        ],
+      };
+
+      const tx = api.tx.xcmPallet.teleportAssets(destination, beneficiary, assets, 0);
+      
+      setModalMessage('Waiting for wallet signature...');
+      const injector = await web3FromAddress(account.address);
+      
+      await new Promise<void>((resolve, reject) => {
+        tx.signAndSend(account.address, { signer: injector.signer }, ({ status, events, dispatchError }) => {
+          setModalTxHash(tx.hash.toHex());
+
+          if (status.isInBlock) {
+            setModalMessage(<>Transaction in block. <br/> Waiting for finalization...</>);
+          } else if (status.isFinalized) {
+            if (dispatchError) {
+              if (dispatchError.isModule) {
+                const decoded = connectedApi.registry.findMetaError(dispatchError.asModule);
+                const { docs, name, section } = decoded;
+                reject(new Error(`Transaction Failed: ${section}.${name} - ${docs.join(' ')}`));
+              } else {
+                reject(new Error(`Transaction Failed: ${dispatchError.toString()}`));
+              }
+              return;
+            }
+
+            const successEvent = events.find(({ event }) => connectedApi.events.system.ExtrinsicSuccess.is(event));
+            if (successEvent) {
+              setModalStatus('success');
+              setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
+              resolve();
+            } else {
+              reject(new Error('Transaction finalized but no success event was found.'));
+            }
+
+          } else if (status.isInvalid) {
+              reject(new Error(`Transaction failed with status: ${status.type}`));
+          } else {
+            setModalMessage(`Transaction status: ${status.type}`);
+          }
+        }).catch((error: any) => {
+          console.error("Sign and send error:", error);
+          reject(error);
+        });
+      });
+
+      // Refresh balance after successful teleport
+      setTimeout(() => {
+        WalletService.getAccountBalance(account.address).then(balance => {
+          setWalletState(prev => ({
+            ...prev,
+            zkVerify: { ...prev.zkVerify, balance }
+          }));
+        });
+      }, 5000);
+
+    } catch (error: any) {
+      console.error('Error teleporting:', error);
+      setModalMessage(`Error: ${error.message || 'An unknown error occurred.'}`);
+      setModalStatus('error');
+    } finally {
+      setIsLoading(false);
+      if (api) {
+        api.disconnect();
+      }
+    }
+  };
+
+  const getButton = () => {
+    if (!walletState.zkVerify.isConnected || !walletState.vflow.isConnected) {
+      return <button type="button" disabled>Connect Wallets to Teleport</button>;
+    }
+    return <button type="submit" disabled={isLoading || !amount}>{isLoading ? 'Teleporting...' : 'Teleport'}</button>;
+  };
+
+  return (
+    <div className="teleport-container">
+      <h1>zkVerify ↔ VFlow Teleport</h1>
+      <div className="panels">
+        <div className="panel">
+          <div className="panel-header">
+            <img src={zkVerifyLogo} alt="zkVerify Logo" className="logo" />
+            <h2>zkVerify</h2>
+            <div className="help-icon" onClick={() => setIsZkVerifyHelpOpen(true)}>?</div>
+          </div>
+          {walletState.zkVerify.isConnected ? (
+            <div>
+              <select onChange={handleZkVerifyAccountChange} value={walletState.zkVerify.account?.address}>
+                {walletState.zkVerify.accounts.map(acc => (
+                  <option key={acc.address} value={acc.address}>{acc.meta.name} ({acc.address.slice(0, 6)}...{acc.address.slice(-4)})</option>
+                ))}
+              </select>
+              <button onClick={() => handleDisconnect('zkVerify')} className="disconnect-button">Disconnect</button>
+            </div>
+          ) : (
+            <button onClick={connectToZkVerify} disabled={isLoading}>Connect Wallet</button>
+          )}
+          {walletState.zkVerify.error && <p className="error-message">{walletState.zkVerify.error}</p>}
+        </div>
+
+        <div className="arrow-container">
+            <img src={chevronIcon} alt="arrow" />
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <VFlowLogo className="logo" />
+            <h2>VFlow</h2>
+          </div>
+          {walletState.vflow.isConnected ? (
+            <div>
+              <div className="address-display">
+                {walletState.vflow.address.slice(0, 6)}...{walletState.vflow.address.slice(-4)}
+              </div>
+              <button onClick={() => handleDisconnect('vflow')} className="disconnect-button">Disconnect Wallet</button>
+            </div>
+          ) : (
+            <button onClick={connectToVFlow}>Connect Wallet</button>
+          )}
+          {walletState.vflow.error && <p className="error-message">{walletState.vflow.error}</p>}
+        </div>
+      </div>
+
+      {(walletState.zkVerify.isConnected && walletState.vflow.isConnected) && (
+        <form onSubmit={handleTeleport} className="teleport-form">
+          <div className="balance-display-container">
+            <span>Balance: {formatBalance(walletState.zkVerify.balance)} tVFY</span>
+          </div>
+          <div className="amount-input-container">
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="0.0"
+              disabled={isLoading}
+            />
+            <button type="button" className="max-button" onClick={handleSetMaxAmount}>Max</button>
+            <div className="token-label">tVFY</div>
+          </div>
+          <div className="button-container">{getButton()}</div>
+        </form>
+      )}
+      
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            {modalStatus === 'loading' && <LoadingIcon className="modal-icon" />}
+            {modalStatus === 'success' && <SuccessIcon className="modal-icon" />}
+            {modalStatus === 'error' && <ErrorIcon className="modal-icon" />}
+            <p>{modalMessage}</p>
+            {modalTxHash && (
+              <p className="tx-hash">
+                <a href={`https://zkverify-testnet.subscan.io/extrinsic/${modalTxHash}`} target="_blank" rel="noopener noreferrer">
+                  View on Explorer
+                </a>
+              </p>
+            )}
+            {(modalStatus === 'success' || modalStatus === 'error') && (
+              <button onClick={() => setIsModalOpen(false)}>Close</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isZkVerifyHelpOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <span className="close-button" onClick={() => setIsZkVerifyHelpOpen(false)}>&times;</span>
+            <h2>What is a zkVerify account?</h2>
+            <p>A zkVerify account is a Substrate-based account. You can create one using extensions like Talisman or the Polkadot.js extension.</p>
+            <p>Make sure you have one of these extensions installed and have created an account.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="tutorial-link" onClick={() => setIsTutorialOpen(true)}>How to Teleport?</div>
+
+      {isTutorialOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <span className="close-button" onClick={() => setIsTutorialOpen(false)}>&times;</span>
+            <h2>Teleport Tutorial</h2>
+            <ol>
+              <li>Connect your zkVerify compatible wallet (e.g., Talisman).</li>
+              <li>Connect your EVM compatible wallet (e.g., MetaMask).</li>
+              <li>Select the zkVerify account you want to send funds from.</li>
+              <li>Enter the amount of tVFY you wish to teleport, or press "Max".</li>
+              <li>Click "Teleport" and sign the transaction in your wallet.</li>
+              <li>Wait for the confirmation message.</li>
+            </ol>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default WalletConnect; 
