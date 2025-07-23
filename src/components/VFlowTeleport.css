@@ -97,6 +97,11 @@ button.disconnect-button {
 .arrow-container img {
   width: 24px;
   height: 24px;
+  transition: transform 0.3s ease;
+}
+
+.arrow-container img.flipped {
+  transform: rotate(180deg);
 }
 
 .address-display {
