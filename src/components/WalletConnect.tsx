@@ -14,6 +14,9 @@ import { ApiPromise } from '@polkadot/api';
 import { VFlowWalletService } from '../services/vflow-wallet';
 import { ss58ToHex } from '../utils/address';
 import { NetworkService } from '../services/network';
+import WalletPanel from './WalletPanel';
+import TransactionModal, { ModalStatus } from './TransactionModal';
+import TeleportForm from './TeleportForm';
 
 const VFLOW_CONFIG = {
   relayWsEndpoint: 'wss://volta-rpc.zkverify.io', // zkVerify Volta testnet RPC
@@ -40,8 +43,6 @@ const initialWalletState: WalletState = {
   zkVerify: { accounts: [], account: null, balance: '0', isConnected: false, error: '' },
   vflow: { address: '', balance: '0', isConnected: false, error: '' },
 };
-
-type ModalStatus = 'idle' | 'loading' | 'success' | 'error';
 
 const WalletConnect: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -87,20 +88,6 @@ const WalletConnect: React.FC = () => {
     }
   }, [walletState.zkVerify.account, walletState.vflow.isConnected, walletState.vflow.address]);
 
-
-  const formatBalance = (balance: string) => {
-    try {
-      const balanceBigInt = BigInt(balance);
-      const decimals = 18; // Correct decimals for tVFY
-      const integerPart = balanceBigInt / BigInt(10 ** decimals);
-      const fractionalPart = balanceBigInt % BigInt(10 ** decimals);
-      const fractionalString = fractionalPart.toString().padStart(decimals, '0').substring(0, 4);
-      return `${integerPart}.${fractionalString}`;
-    } catch (e) {
-      console.error("Could not format balance", e);
-      return "0.0000";
-    }
-  };
 
   const connectToZkVerify = async () => {
     setIsLoading(true);
@@ -178,14 +165,6 @@ const WalletConnect: React.FC = () => {
         zkVerify: { ...prev.zkVerify, account: selectedAccount }
       }));
     }
-  };
-
-  const handleSetMaxAmount = () => {
-    const balance = teleportDirection === 'zkv-to-vflow'
-      ? walletState.zkVerify.balance
-      : walletState.vflow.balance;
-    const formattedBalance = ethers.formatUnits(balance, 18);
-    setAmount(formattedBalance);
   };
 
   const handleTeleport = async (event: React.FormEvent) => {
@@ -346,85 +325,55 @@ const WalletConnect: React.FC = () => {
   };
 
   const fromPanel = teleportDirection === 'zkv-to-vflow' ? (
-    <div className="panel">
-      <div className="panel-header">
-        <img src={zkVerifyLogo} alt="zkVerify Logo" className="logo" />
-        <h2>zkVerify</h2>
-        <div className="help-icon" onClick={() => setIsZkVerifyHelpOpen(true)}>?</div>
-      </div>
-      {walletState.zkVerify.isConnected ? (
-        <div>
-          <select onChange={handleZkVerifyAccountChange} value={walletState.zkVerify.account?.address}>
-            {walletState.zkVerify.accounts.map(acc => (
-              <option key={acc.address} value={acc.address}>{acc.meta.name} ({acc.address.slice(0, 6)}...{acc.address.slice(-4)})</option>
-            ))}
-          </select>
-          <button onClick={() => handleDisconnect('zkVerify')} className="disconnect-button">Disconnect</button>
-        </div>
-      ) : (
-        <button onClick={connectToZkVerify} disabled={isLoading}>Connect Wallet</button>
-      )}
-      {walletState.zkVerify.error && <p className="error-message">{walletState.zkVerify.error}</p>}
-    </div>
+    <WalletPanel
+      type="zkVerify"
+      isConnected={walletState.zkVerify.isConnected}
+      accounts={walletState.zkVerify.accounts}
+      selectedAccount={walletState.zkVerify.account}
+      error={walletState.zkVerify.error}
+      onConnect={connectToZkVerify}
+      onDisconnect={() => handleDisconnect('zkVerify')}
+      onAccountChange={handleZkVerifyAccountChange}
+      isLoading={isLoading}
+      onHelp={() => setIsZkVerifyHelpOpen(true)}
+    />
   ) : (
-    <div className="panel">
-      <div className="panel-header">
-        <VFlowLogo className="logo" />
-        <h2>VFlow</h2>
-      </div>
-      {walletState.vflow.isConnected ? (
-        <div>
-          <div className="address-display">
-            {walletState.vflow.address.slice(0, 6)}...{walletState.vflow.address.slice(-4)}
-          </div>
-          <button onClick={() => handleDisconnect('vflow')} className="disconnect-button">Disconnect Wallet</button>
-        </div>
-      ) : (
-        <button onClick={connectToVFlow}>Connect Wallet</button>
-      )}
-      {walletState.vflow.error && <p className="error-message">{walletState.vflow.error}</p>}
-    </div>
+    <WalletPanel
+      type="VFlow"
+      isConnected={walletState.vflow.isConnected}
+      address={walletState.vflow.address}
+      error={walletState.vflow.error}
+      onConnect={connectToVFlow}
+      onDisconnect={() => handleDisconnect('vflow')}
+      isLoading={isLoading}
+      onHelp={() => {}} // No help for VFlow
+    />
   );
 
   const toPanel = teleportDirection === 'zkv-to-vflow' ? (
-    <div className="panel">
-      <div className="panel-header">
-        <VFlowLogo className="logo" />
-        <h2>VFlow</h2>
-      </div>
-      {walletState.vflow.isConnected ? (
-        <div>
-          <div className="address-display">
-            {walletState.vflow.address.slice(0, 6)}...{walletState.vflow.address.slice(-4)}
-          </div>
-          <button onClick={() => handleDisconnect('vflow')} className="disconnect-button">Disconnect Wallet</button>
-        </div>
-      ) : (
-        <button onClick={connectToVFlow}>Connect Wallet</button>
-      )}
-      {walletState.vflow.error && <p className="error-message">{walletState.vflow.error}</p>}
-    </div>
+    <WalletPanel
+      type="VFlow"
+      isConnected={walletState.vflow.isConnected}
+      address={walletState.vflow.address}
+      error={walletState.vflow.error}
+      onConnect={connectToVFlow}
+      onDisconnect={() => handleDisconnect('vflow')}
+      isLoading={isLoading}
+      onHelp={() => {}} // No help for VFlow
+    />
   ) : (
-    <div className="panel">
-      <div className="panel-header">
-        <img src={zkVerifyLogo} alt="zkVerify Logo" className="logo" />
-        <h2>zkVerify</h2>
-        <div className="help-icon" onClick={() => setIsZkVerifyHelpOpen(true)}>?</div>
-      </div>
-      {walletState.zkVerify.isConnected ? (
-        <div>
-          <select onChange={handleZkVerifyAccountChange} value={walletState.zkVerify.account?.address}>
-            {walletState.zkVerify.accounts.map(acc => (
-              <option key={acc.address} value={acc.address}>{acc.meta.name} ({acc.address.slice(0, 6)}...{acc.address.slice(-4)})</option>
-            ))}
-          </select>
-          <button onClick={() => handleDisconnect('zkVerify')} className="disconnect-button">Disconnect</button>
-        </div>
-      ) : (
-        <button onClick={connectToZkVerify} disabled={isLoading}>Connect Wallet</button>
-      )}
-      {walletState.zkVerify.error && <p className="error-message">{walletState.zkVerify.error}</p>}
-    </div>
+    <WalletPanel
+      type="zkVerify"
+      isConnected={walletState.zkVerify.isConnected}
+      accounts={walletState.zkVerify.accounts}
+      selectedAccount={walletState.zkVerify.account}
+      error={walletState.zkVerify.error}
+      onConnect={connectToZkVerify}
+      onDisconnect={() => handleDisconnect('zkVerify')}
+      onAccountChange={handleZkVerifyAccountChange}
+      isLoading={isLoading}
+      onHelp={() => setIsZkVerifyHelpOpen(true)}
+    />
   );
 
 
@@ -440,50 +389,25 @@ const WalletConnect: React.FC = () => {
       </div>
 
       {(walletState.zkVerify.isConnected && walletState.vflow.isConnected) && (
-        <form onSubmit={handleTeleport} className="teleport-form">
-          <div className="balance-display-container">
-            <span>Balance: {formatBalance(
-              teleportDirection === 'zkv-to-vflow'
-                ? walletState.zkVerify.balance
-                : walletState.vflow.balance
-            )} tVFY</span>
-          </div>
-          <div className="amount-input-container">
-            <input
-              type="number"
-              step="any"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.0"
-              disabled={isLoading}
-            />
-            <button type="button" className="max-button" onClick={handleSetMaxAmount}>Max</button>
-            <div className="token-label">tVFY</div>
-          </div>
-          <div className="button-container">{getButton()}</div>
-        </form>
+        <TeleportForm
+          teleportDirection={teleportDirection}
+          zkVerifyBalance={walletState.zkVerify.balance}
+          vflowBalance={walletState.vflow.balance}
+          amount={amount}
+          onAmountChange={setAmount}
+          onSubmit={handleTeleport}
+          isLoading={isLoading}
+          getButton={getButton}
+        />
       )}
       
-      {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            {modalStatus === 'loading' && <LoadingIcon className="modal-icon" />}
-            {modalStatus === 'success' && <SuccessIcon className="modal-icon" />}
-            {modalStatus === 'error' && <ErrorIcon className="modal-icon" />}
-            <p>{modalMessage}</p>
-            {modalTxHash && (
-              <p className="tx-hash">
-                <a href={`https://zkverify-testnet.subscan.io/extrinsic/${modalTxHash}`} target="_blank" rel="noopener noreferrer">
-                  View on Explorer
-                </a>
-              </p>
-            )}
-            {(modalStatus === 'success' || modalStatus === 'error') && (
-              <button onClick={() => setIsModalOpen(false)}>Close</button>
-            )}
-          </div>
-        </div>
-      )}
+      <TransactionModal
+        isOpen={isModalOpen}
+        status={modalStatus}
+        message={modalMessage}
+        txHash={modalTxHash}
+        onClose={() => setIsModalOpen(false)}
+      />
 
       {isZkVerifyHelpOpen && (
         <div className="modal-overlay">
