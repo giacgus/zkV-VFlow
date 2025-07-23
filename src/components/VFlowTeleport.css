@@ -92,6 +92,30 @@ button.disconnect-button {
   justify-content: center;
   flex-basis: 50px;
   align-self: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.arrow-container .tooltip-text {
+  visibility: hidden;
+  width: 120px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%; /* Position the tooltip above the arrow */
+  left: 50%;
+  margin-left: -60px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.arrow-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
 }
 
 .arrow-container img {
@@ -250,6 +274,19 @@ button:disabled {
   width: 50px;
   height: 50px;
   margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
 }
 
 .modal-content p {

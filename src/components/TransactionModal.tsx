@@ -33,7 +33,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        {status === 'loading' && <LoadingIcon className="modal-icon" />}
+        {status === 'loading' && <LoadingIcon className="modal-icon loading-spinner" />}
         {status === 'success' && <SuccessIcon className="modal-icon" />}
         {status === 'error' && <ErrorIcon className="modal-icon" />}
         <p>{message}</p>

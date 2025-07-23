@@ -17,6 +17,7 @@ import { NetworkService } from '../services/network';
 import WalletPanel from './WalletPanel';
 import TransactionModal, { ModalStatus } from './TransactionModal';
 import TeleportForm from './TeleportForm';
+import { getEthersProvider } from '../services/provider';
 
 const VFLOW_CONFIG = {
   relayWsEndpoint: 'wss://volta-rpc.zkverify.io', // zkVerify Volta testnet RPC
@@ -115,18 +116,24 @@ const WalletConnect: React.FC = () => {
 
   const connectToVFlow = async () => {
     try {
-      await NetworkService.checkAndSwitchNetwork();
-      const ethereum = (window as any).ethereum;
-      if (typeof ethereum === 'undefined') {
-        setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, error: 'MetaMask is not installed.' } }));
-        return;
-      }
-      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      // First, get the wallet to open and get the user's permission.
+      const provider = getEthersProvider();
+      const accounts = await provider.send('eth_requestAccounts', []);
       const address = accounts[0];
+
+      if (!address) {
+        throw new Error("Could not connect to wallet.");
+      }
+      
+      // Now that we have a connection, check if the network is correct.
+      await NetworkService.checkAndSwitchNetwork();
+
+      // Set state after everything is successful.
       setWalletState(prev => ({
         ...prev,
-        vflow: { address, isConnected: true, error: '', balance: '0' },
+        vflow: { address: address, isConnected: true, error: '', balance: '0' },
       }));
+
     } catch (error: any) {
       setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, error: error.message } }));
     }
@@ -279,7 +286,7 @@ const WalletConnect: React.FC = () => {
       try {
         await NetworkService.checkAndSwitchNetwork();
         
-        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const provider = getEthersProvider();
         const signer = await provider.getSigner(vflowAddress);
         
         const destinationHex = ss58ToHex(zkVerifyAccount!.address);
@@ -383,7 +390,8 @@ const WalletConnect: React.FC = () => {
       <div className="panels">
         {fromPanel}
         <div className="arrow-container" onClick={handleToggleDirection}>
-            <img src={chevronIcon} alt="arrow" className={`arrow-icon ${teleportDirection === 'vflow-to-zkv' ? 'flipped' : ''}`} />
+            <img src={chevronIcon} alt="arrow" className="arrow-icon" />
+            <span className="tooltip-text">Click to switch direction</span>
         </div>
         {toPanel}
       </div>
