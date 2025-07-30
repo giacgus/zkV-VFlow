@@ -39,8 +39,15 @@ const TeleportForm: React.FC<TeleportFormProps> = ({
 
   const handleSetMaxAmount = () => {
     const balance = teleportDirection === 'zkv-to-vflow' ? zkVerifyBalance : vflowBalance;
-    const formattedBalance = ethers.formatUnits(balance, 18);
-    onAmountChange(formattedBalance);
+    const balanceBN = ethers.parseUnits(ethers.formatUnits(balance, 18), 18);
+    const feeBuffer = ethers.parseUnits('0.01', 18);
+
+    if (balanceBN > feeBuffer) {
+      const maxAmount = balanceBN - feeBuffer;
+      onAmountChange(ethers.formatUnits(maxAmount, 18));
+    } else {
+      onAmountChange('0');
+    }
   };
   
   return (
