@@ -4,7 +4,7 @@ import { web3FromAddress, web3Enable } from '@polkadot/extension-dapp';
 import { WalletService } from '../services/wallet';
 import './VFlowTeleport.css';
 import zkVerifyLogo from '../assets/zkverify_logo.png';
-import { ReactComponent as VFlowLogo } from '../assets/vflow_logo.svg';
+import vflowTempLogo from '../assets/vflow_temp.png';
 import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
 import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
 import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
@@ -390,8 +390,8 @@ const WalletConnect: React.FC = () => {
       <div className="panels">
         {fromPanel}
         <div className="arrow-container" onClick={handleToggleDirection}>
-            <img src={chevronIcon} alt="arrow" className="arrow-icon" />
-            <span className="tooltip-text">Click to switch direction</span>
+          <img src={chevronIcon} alt="Switch direction" className="arrow-icon" />
+          <div className="tooltip-text">Switch Direction</div>
         </div>
         {toPanel}
       </div>
@@ -415,6 +415,7 @@ const WalletConnect: React.FC = () => {
         message={modalMessage}
         txHash={modalTxHash}
         onClose={() => setIsModalOpen(false)}
+        direction={teleportDirection}
       />
 
       {isZkVerifyHelpOpen && (

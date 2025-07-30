@@ -1,6 +1,6 @@
 import React from 'react';
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import { ReactComponent as VFlowLogo } from '../assets/vflow_logo.svg';
+import vflowTempLogo from '../assets/vflow_temp.png';
 import zkVerifyLogo from '../assets/zkverify_logo.png';
 
 interface WalletPanelProps {
@@ -30,13 +30,13 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
   isLoading,
   onHelp,
 }) => {
-  const logo = type === 'zkVerify' ? zkVerifyLogo : <VFlowLogo className="logo" />;
+  const logo = type === 'zkVerify' ? zkVerifyLogo : vflowTempLogo;
   const name = type === 'zkVerify' ? 'zkVerify' : 'VFlow';
 
   return (
     <div className="panel">
       <div className="panel-header">
-        {typeof logo === 'string' ? <img src={logo} alt={`${name} Logo`} className="logo" /> : logo}
+        <img src={logo} alt={`${name} Logo`} className="logo" />
         <h2>{name}</h2>
         {type === 'zkVerify' && <div className="help-icon" onClick={onHelp}>?</div>}
       </div>

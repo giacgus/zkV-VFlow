@@ -19,5 +19,5 @@ export const vflowNetwork: NetworkConfig = {
     decimals: 18,
   },
   rpcUrls: ['https://vflow-rpc.zkverify.io'],
-  blockExplorerUrls: [], // Optional: Add a block explorer URL if available
+  blockExplorerUrls: ['https://1780.prev.subscan.io/'], // Optional: Add a block explorer URL if available
 }; 

@@ -11,6 +11,7 @@ interface TransactionModalProps {
   message: React.ReactNode;
   txHash: string;
   onClose: () => void;
+  direction: 'zkv-to-vflow' | 'vflow-to-zkv';
 }
 
 const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -19,14 +20,17 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   message,
   txHash,
   onClose,
+  direction,
 }) => {
   if (!isOpen) return null;
 
   const getExplorerLink = () => {
     if (!txHash) return undefined;
-    const baseUrl = txHash.startsWith('0x')
-      ? 'https://vflow-scan.zkverify.io/tx/' // VFlow Explorer
-      : 'https://zkverify-testnet.subscan.io/extrinsic/'; // zkVerify Explorer
+    // zkV -> VFlow is an extrinsic
+    // VFlow -> zkV is a tx
+    const baseUrl = direction === 'vflow-to-zkv'
+      ? 'https://1780.prev.subscan.io/tx/' 
+      : 'https://1780.prev.subscan.io/extrinsic/';
     return `${baseUrl}${txHash}`;
   };
 

@@ -88,34 +88,20 @@ button.disconnect-button {
 
 .arrow-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-basis: 50px;
   align-self: center;
-  position: relative;
   cursor: pointer;
+  gap: 0.5rem;
+  padding: 0 1rem;
 }
 
 .arrow-container .tooltip-text {
-  visibility: hidden;
-  width: 120px;
-  background-color: #555;
-  color: #fff;
+  color: #8b949e;
+  font-size: 0.8rem;
   text-align: center;
-  border-radius: 6px;
-  padding: 5px 0;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%; /* Position the tooltip above the arrow */
-  left: 50%;
-  margin-left: -60px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.arrow-container:hover .tooltip-text {
-  visibility: visible;
-  opacity: 1;
+  line-height: 1.2;
 }
 
 .arrow-container img {
