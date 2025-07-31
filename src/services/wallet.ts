@@ -63,8 +63,8 @@ export class WalletService {
   static async getAccountBalance(address: string): Promise<string> {
     const api = await this.connectApi();
     try {
-      const accountInfo = await api.query.system.account(address) as any;
-      return accountInfo.data.free.toString();
+      const balances = await api.derive.balances.all(address);
+      return balances.availableBalance.toString();
     } catch (error) {
       console.error('Failed to fetch balance:', error);
       return '0';
