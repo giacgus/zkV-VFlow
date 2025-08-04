@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
 import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
 import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
+import { vflowNetwork, zkVerifyNetwork } from '../config/networks';
 
 export type ModalStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -22,38 +23,72 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   onClose,
   direction,
 }) => {
+  const [isFinalSuccess, setIsFinalSuccess] = useState(false);
+
+  useEffect(() => {
+    if (status === 'success') {
+      const timer = setTimeout(() => {
+        setIsFinalSuccess(true);
+      }, 1000); 
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsFinalSuccess(false);
+    }
+  }, [status]);
+
   if (!isOpen) return null;
 
   const getExplorerLink = () => {
     if (!txHash) return undefined;
-    // zkV -> VFlow is an extrinsic
-    // VFlow -> zkV is a tx
-    const baseUrl = direction === 'vflow-to-zkv'
-      ? 'https://1780.prev.subscan.io/tx/' 
-      : 'https://1780.prev.subscan.io/extrinsic/';
+    
+    let baseUrl = '';
+    if (direction === 'vflow-to-zkv') {
+      baseUrl = `${vflowNetwork.blockExplorerUrls?.[0] || ''}tx/`;
+    } else {
+      baseUrl = `${zkVerifyNetwork.blockExplorerUrls?.[0] || ''}extrinsic/`;
+    }
+
     return `${baseUrl}${txHash}`;
   };
+  
+  const renderContent = () => {
+    if (status === 'success' && !isFinalSuccess) {
+      return (
+        <>
+          <LoadingIcon className="modal-icon loading-spinner" />
+          <p>Transaction successful. Preparing link...</p>
+        </>
+      );
+    }
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    return (
+      <>
         {status === 'loading' && <LoadingIcon className="modal-icon loading-spinner" />}
-        {status === 'success' && <SuccessIcon className="modal-icon" />}
+        {status === 'success' && isFinalSuccess && <SuccessIcon className="modal-icon" />}
         {status === 'error' && <ErrorIcon className="modal-icon" />}
         <p>{message}</p>
-        {txHash && (
+        {isFinalSuccess && txHash && (
           <p className="tx-hash">
             <a href={getExplorerLink()} target="_blank" rel="noopener noreferrer">
               View on Explorer
             </a>
           </p>
         )}
-        {(status === 'success' || status === 'error') && (
+        {(isFinalSuccess || status === 'error') && (
           <button onClick={onClose}>Close</button>
         )}
+      </>
+    );
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        {renderContent()}
       </div>
     </div>
   );
 };
 
-export default TransactionModal; 
+export default TransactionModal;

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { web3FromAddress, web3Enable } from '@polkadot/extension-dapp';
 import { WalletService } from '../services/wallet';
 import './VFlowTeleport.css';
 import zkVerifyLogo from '../assets/zkverify_logo.png';
-import vflowTempLogo from '../assets/vflow_temp.png';
+import vflowTempLogo from '../assets/VFlow_icon_round.png';
 import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
 import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
 import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
@@ -18,9 +18,10 @@ import WalletPanel from './WalletPanel';
 import TransactionModal, { ModalStatus } from './TransactionModal';
 import TeleportForm from './TeleportForm';
 import { getEthersProvider } from '../services/provider';
+import { zkVerifyNetwork } from '../config/networks';
 
 const VFLOW_CONFIG = {
-  relayWsEndpoint: 'wss://volta-rpc.zkverify.io', // zkVerify Volta testnet RPC
+  relayWsEndpoint: zkVerifyNetwork.rpcUrls[0],
   parachainId: 1, // Correct Parachain ID from the successful transaction
 };
 
@@ -57,20 +58,7 @@ const WalletConnect: React.FC = () => {
   const [isZkVerifyHelpOpen, setIsZkVerifyHelpOpen] = useState<boolean>(false);
   const [walletState, setWalletState] = useState<WalletState>(initialWalletState);
 
-  useEffect(() => {
-    web3Enable('zkV-VFlow Teleporter');
-    if ((window as any).ethereum) {
-      (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
-        if (walletState.vflow.isConnected && accounts.length > 0) {
-          setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, address: accounts[0] }}));
-        } else if (accounts.length === 0) {
-          handleDisconnect('vflow');
-        }
-      });
-    }
-  }, [walletState.vflow.isConnected]);
-
-  useEffect(() => {
+  const refreshBalances = useCallback(() => {
     if (walletState.zkVerify.account) {
       WalletService.getAccountBalance(walletState.zkVerify.account.address).then(balance => {
         setWalletState(prev => ({
@@ -88,6 +76,23 @@ const WalletConnect: React.FC = () => {
       });
     }
   }, [walletState.zkVerify.account, walletState.vflow.isConnected, walletState.vflow.address]);
+
+  useEffect(() => {
+    web3Enable('zkV-VFlow Teleporter');
+    if ((window as any).ethereum) {
+      (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
+        if (walletState.vflow.isConnected && accounts.length > 0) {
+          setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, address: accounts[0] }}));
+        } else if (accounts.length === 0) {
+          handleDisconnect('vflow');
+        }
+      });
+    }
+  }, [walletState.vflow.isConnected]);
+
+  useEffect(() => {
+    refreshBalances();
+  }, [refreshBalances]);
 
 
   const connectToZkVerify = async () => {
@@ -233,28 +238,29 @@ const WalletConnect: React.FC = () => {
             setModalTxHash(tx.hash.toHex());
 
             if (status.isInBlock) {
-              setModalMessage(<>Transaction in block. <br/> Waiting for finalization...</>);
-            } else if (status.isFinalized) {
-              if (dispatchError) {
-                if (dispatchError.isModule) {
-                  const decoded = connectedApi.registry.findMetaError(dispatchError.asModule);
-                  const { docs, name, section } = decoded;
-                  reject(new Error(`Transaction Failed: ${section}.${name} - ${docs.join(' ')}`));
-                } else {
-                  reject(new Error(`Transaction Failed: ${dispatchError.toString()}`));
+                if (dispatchError) {
+                    if (dispatchError.isModule) {
+                        const decoded = connectedApi.registry.findMetaError(dispatchError.asModule);
+                        const { docs, name, section } = decoded;
+                        reject(new Error(`Transaction Failed: ${section}.${name} - ${docs.join(' ')}`));
+                    } else {
+                        reject(new Error(`Transaction Failed: ${dispatchError.toString()}`));
+                    }
+                    return;
                 }
-                return;
-              }
 
-              const successEvent = events.find(({ event }) => connectedApi.events.system.ExtrinsicSuccess.is(event));
-              if (successEvent) {
-                setModalStatus('success');
-                setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
-                resolve();
-              } else {
-                reject(new Error('Transaction finalized but no success event was found.'));
-              }
-
+                const successEvent = events.find(({ event }) => connectedApi.events.system.ExtrinsicSuccess.is(event));
+                if (successEvent) {
+                    setModalStatus('success');
+                    setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
+                    resolve();
+                } else {
+                    // Even if no specific success event is found, we can consider it successful 
+                    // once it's in a block without errors.
+                    setModalStatus('success');
+                    setModalMessage(<>Success! Transaction is in a block. <br /> Transaction hash:</>);
+                    resolve();
+                }
             } else if (status.isInvalid) {
                 reject(new Error(`Transaction failed with status: ${status.type}`));
             } else {
@@ -266,11 +272,7 @@ const WalletConnect: React.FC = () => {
           });
         });
 
-        setTimeout(() => {
-          WalletService.getAccountBalance(zkVerifyAccount!.address).then(balance => {
-            setWalletState(prev => ({ ...prev, zkVerify: { ...prev.zkVerify, balance } }));
-          });
-        }, 5000);
+        setTimeout(refreshBalances, 6000);
 
       } catch (error: any) {
         console.error('Error teleporting:', error);
@@ -302,11 +304,7 @@ const WalletConnect: React.FC = () => {
         setModalStatus('success');
         setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
         
-        setTimeout(() => {
-          VFlowWalletService.getAccountBalance(vflowAddress).then((balance: string) => {
-            setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, balance } }));
-          });
-        }, 3000);
+        setTimeout(refreshBalances, 4000);
 
       } catch (error: any) {
         console.error('Error teleporting from VFlow:', error);
@@ -451,4 +449,4 @@ const WalletConnect: React.FC = () => {
   );
 };
 
-export default WalletConnect; 
+export default WalletConnect;

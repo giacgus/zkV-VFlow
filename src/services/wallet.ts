@@ -1,8 +1,9 @@
 import { web3Accounts, web3Enable, web3FromSource } from '@polkadot/extension-dapp';
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { ApiPromise, WsProvider } from '@polkadot/api';
+import { zkVerifyNetwork } from '../config/networks';
 
-const ZKVERIFY_WS_ENDPOINT = 'wss://volta-rpc.zkverify.io'; // zkVerify Volta endpoint
+const ZKVERIFY_WS_ENDPOINT = zkVerifyNetwork.rpcUrls[0]; // zkVerify Volta endpoint
 
 export class WalletService {
   private static api: ApiPromise | null = null;
@@ -118,4 +119,4 @@ export class WalletService {
       throw new Error(error.message || 'Failed to send remark. Please check your wallet connection.');
     }
   }
-} 
+}

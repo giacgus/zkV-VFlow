@@ -1,6 +1,6 @@
 import React from 'react';
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import vflowTempLogo from '../assets/vflow_temp.png';
+import vflowTempLogo from '../assets/VFlow_icon_round.png';
 import zkVerifyLogo from '../assets/zkverify_logo.png';
 
 interface WalletPanelProps {
@@ -56,7 +56,12 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
               {address.slice(0, 6)}...{address.slice(-4)}
             </div>
           )}
-          <button onClick={onDisconnect} className="disconnect-button">Disconnect</button>
+          <div className="disconnect-container">
+            <button onClick={onDisconnect} className="disconnect-button">Disconnect</button>
+            <span className="disconnect-tooltip">
+              To fully disconnect, you must do so from your wallet extension.
+            </span>
+          </div>
         </div>
       ) : (
         <button onClick={onConnect} disabled={isLoading}>Connect Wallet</button>
@@ -66,4 +71,4 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
   );
 };
 
-export default WalletPanel; 
+export default WalletPanel;
