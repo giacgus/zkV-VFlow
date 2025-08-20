@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
-import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
-import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
 import { vflowNetwork, zkVerifyNetwork } from '../config/networks';
 
 export type ModalStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -29,7 +26,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     if (status === 'success') {
       const timer = setTimeout(() => {
         setIsFinalSuccess(true);
-      }, 1000); 
+      }, 1000);
 
       return () => clearTimeout(timer);
     } else {
@@ -41,7 +38,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const getExplorerLink = () => {
     if (!txHash) return undefined;
-    
+
     let baseUrl = '';
     if (direction === 'vflow-to-zkv') {
       baseUrl = `${vflowNetwork.blockExplorerUrls?.[0] || ''}tx/`;
@@ -51,12 +48,12 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
     return `${baseUrl}${txHash}`;
   };
-  
+
   const renderContent = () => {
     if (status === 'success' && !isFinalSuccess) {
       return (
         <>
-          <LoadingIcon className="modal-icon loading-spinner" />
+          <div className="modal-icon loading-spinner"></div>
           <p>Transaction successful. Preparing link...</p>
         </>
       );
@@ -64,9 +61,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
     return (
       <>
-        {status === 'loading' && <LoadingIcon className="modal-icon loading-spinner" />}
-        {status === 'success' && isFinalSuccess && <SuccessIcon className="modal-icon" />}
-        {status === 'error' && <ErrorIcon className="modal-icon" />}
+        {status === 'loading' && <div className="modal-icon loading-spinner"></div>}
+        {status === 'success' && isFinalSuccess && <div className="modal-icon success-icon"></div>}
+        {status === 'error' && <div className="modal-icon error-icon"></div>}
         <p>{message}</p>
         {isFinalSuccess && txHash && (
           <p className="tx-hash">

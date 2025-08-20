@@ -51,6 +51,7 @@ body {
   width: 40px;
   height: 40px;
 }
+
 .panel-header h2 {
   font-size: 1.5rem;
   margin: 0;
@@ -140,6 +141,7 @@ button.disconnect-button {
   color: #c9d1d9;
   font-size: 1rem;
 }
+
 .address-input:disabled {
   background: #161b22;
   cursor: not-allowed;
@@ -167,6 +169,7 @@ button.disconnect-button {
   padding: 0.5rem 1rem;
   margin-bottom: 1.5rem;
 }
+
 .amount-input-container input {
   flex-grow: 1;
   background: transparent;
@@ -217,6 +220,12 @@ button {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+/* Match Substrate button typography to RainbowKit */
+button.substrate-connect {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  font-weight: 600;
 }
 
 button:hover:not(:disabled) {
@@ -271,6 +280,7 @@ button:disabled {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -278,6 +288,63 @@ button:disabled {
 
 .loading-spinner {
   animation: spin 1s linear infinite;
+  border: 3px solid #30363d;
+  border-top: 3px solid #58a6ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+}
+
+.success-icon {
+  width: 40px;
+  height: 40px;
+  background: #238636;
+  border-radius: 50%;
+  margin: 0 auto;
+  position: relative;
+}
+
+.success-icon::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 8px;
+  border: 2px solid white;
+  border-top: none;
+  border-right: none;
+  transform: translate(-50%, -60%) rotate(-45deg);
+}
+
+.error-icon {
+  width: 40px;
+  height: 40px;
+  background: #f85149;
+  border-radius: 50%;
+  margin: 0 auto;
+  position: relative;
+}
+
+.error-icon::before,
+.error-icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 2px;
+  background: white;
+}
+
+.error-icon::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.error-icon::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .modal-content p {
@@ -330,6 +397,7 @@ button:disabled {
   border: none;
   background: none;
 }
+
 .modal-content .close-button {
   position: relative;
   float: right;
@@ -338,28 +406,28 @@ button:disabled {
 }
 
 .disconnect-container {
-    position: relative;
+  position: relative;
 }
 
 .disconnect-container .disconnect-tooltip {
-    visibility: hidden;
-    width: 200px;
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    padding: 8px;
-    position: absolute;
-    z-index: 1;
-    bottom: 110%;
-    left: 50%;
-    margin-left: -100px;
-    opacity: 0;
-    transition: opacity 0.3s;
-    font-size: 12px;
+  visibility: hidden;
+  width: 200px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px;
+  position: absolute;
+  z-index: 1;
+  bottom: 110%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 12px;
 }
 
 .disconnect-container:hover .disconnect-tooltip {
-    visibility: visible;
-    opacity: 1;
+  visibility: visible;
+  opacity: 1;
 }
