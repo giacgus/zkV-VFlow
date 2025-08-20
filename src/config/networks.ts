@@ -18,12 +18,12 @@ export const vflowNetwork: NetworkConfig = {
     symbol: 'tVFY',
     decimals: 18,
   },
-  rpcUrls: ['https://vflow-rpc.zkverify.io'],
+  rpcUrls: ['https://vflow-volta-rpc.zkverify.io'],
   blockExplorerUrls: ['https://vflow-testnet.subscan.io/'],
 };
 
 export const zkVerifyNetwork = {
     chainName: 'zkVerify Testnet',
-    rpcUrls: ['wss://volta-rpc.zkverify.io'],
+    rpcUrls: ['wss://zkverify-volta-rpc.zkverify.io'],
     blockExplorerUrls: ['https://zkverify-testnet.subscan.io/'],
 };

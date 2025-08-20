@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-const VFLOW_RPC_URL = 'https://vflow-rpc.zkverify.io';
+const VFLOW_RPC_URL = 'https://vflow-volta-rpc.zkverify.io';
 const XCM_PRECOMPILE_ADDRESS = '0x000000000000000000000000000000000000080C';
 
 const teleportABI = [
