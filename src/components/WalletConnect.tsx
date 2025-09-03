@@ -1,24 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
-import { web3FromAddress, web3Enable } from '@polkadot/extension-dapp';
+import { web3Enable, web3FromAddress } from '@polkadot/extension-dapp';
 import { WalletService } from '../services/wallet';
 import './VFlowTeleport.css';
-import zkVerifyLogo from '../assets/zkverify_logo.png';
-import vflowTempLogo from '../assets/VFlow_icon_round.png';
-import { ReactComponent as LoadingIcon } from '../assets/loading_icon.svg';
-import { ReactComponent as SuccessIcon } from '../assets/success_icon.svg';
-import { ReactComponent as ErrorIcon } from '../assets/error_icon.svg';
-import chevronIcon from '../assets/chevron.png';
-import { ethers } from 'ethers';
-import { ApiPromise } from '@polkadot/api';
-import { VFlowWalletService } from '../services/vflow-wallet';
-import { ss58ToHex } from '../utils/address';
-import { NetworkService } from '../services/network';
 import WalletPanel from './WalletPanel';
+import RainbowKitWalletPanel from './RainbowKitWalletPanel';
 import TransactionModal, { ModalStatus } from './TransactionModal';
 import TeleportForm from './TeleportForm';
-import { getEthersProvider } from '../services/provider';
 import { zkVerifyNetwork } from '../config/networks';
+import { useAccount, useBalance } from 'wagmi';
+import { vflowChain } from '../providers/wagmi';
+import { ethers } from 'ethers';
+import { ApiPromise } from '@polkadot/api';
+import { NetworkService } from '../services/network';
+import { ss58ToHex } from '../utils/address';
+import { VFlowWalletService } from '../services/vflow-wallet';
+import chevronIcon from '../assets/chevron.png';
 
 const VFLOW_CONFIG = {
   relayWsEndpoint: zkVerifyNetwork.rpcUrls[0],
@@ -58,6 +55,10 @@ const WalletConnect: React.FC = () => {
   const [isZkVerifyHelpOpen, setIsZkVerifyHelpOpen] = useState<boolean>(false);
   const [walletState, setWalletState] = useState<WalletState>(initialWalletState);
 
+  // Use RainbowKit for EVM wallet state
+  const { address: vflowAddress, isConnected: vflowIsConnected } = useAccount();
+  const { data: vflowBalanceData } = useBalance({ address: vflowAddress, chainId: vflowChain.id });
+
   const refreshBalances = useCallback(() => {
     if (walletState.zkVerify.account) {
       WalletService.getAccountBalance(walletState.zkVerify.account.address).then(balance => {
@@ -67,28 +68,12 @@ const WalletConnect: React.FC = () => {
         }));
       });
     }
-    if (walletState.vflow.isConnected && walletState.vflow.address) {
-      VFlowWalletService.getAccountBalance(walletState.vflow.address).then((balance: string) => {
-        setWalletState(prev => ({
-          ...prev,
-          vflow: { ...prev.vflow, balance }
-        }));
-      });
-    }
-  }, [walletState.zkVerify.account, walletState.vflow.isConnected, walletState.vflow.address]);
+    // VFlow balance is now handled by RainbowKit
+  }, [walletState.zkVerify.account]);
 
   useEffect(() => {
     web3Enable('zkV-VFlow Teleporter');
-    if ((window as any).ethereum) {
-      (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
-        if (walletState.vflow.isConnected && accounts.length > 0) {
-          setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, address: accounts[0] }}));
-        } else if (accounts.length === 0) {
-          handleDisconnect('vflow');
-        }
-      });
-    }
-  }, [walletState.vflow.isConnected]);
+  }, []);
 
   useEffect(() => {
     refreshBalances();
@@ -119,30 +104,7 @@ const WalletConnect: React.FC = () => {
     }
   };
 
-  const connectToVFlow = async () => {
-    try {
-      // First, get the wallet to open and get the user's permission.
-      const provider = getEthersProvider();
-      const accounts = await provider.send('eth_requestAccounts', []);
-      const address = accounts[0];
-
-      if (!address) {
-        throw new Error("Could not connect to wallet.");
-      }
-      
-      // Now that we have a connection, check if the network is correct.
-      await NetworkService.checkAndSwitchNetwork();
-
-      // Set state after everything is successful.
-      setWalletState(prev => ({
-        ...prev,
-        vflow: { address: address, isConnected: true, error: '', balance: '0' },
-      }));
-
-    } catch (error: any) {
-      setWalletState(prev => ({ ...prev, vflow: { ...prev.vflow, error: error.message } }));
-    }
-  };
+  // VFlow connection is now handled by RainbowKit
 
   const handleDisconnect = (walletType: 'zkVerify' | 'vflow') => {
     if (walletType === 'zkVerify') {
@@ -157,12 +119,8 @@ const WalletConnect: React.FC = () => {
           error: '',
         },
       }));
-    } else {
-      setWalletState(prev => ({
-        ...prev,
-        vflow: { address: '', isConnected: false, error: '', balance: '0' },
-      }));
     }
+    // VFlow disconnection is now handled by RainbowKit
     setModalMessage('');
     setModalTxHash('');
     setModalStatus('idle');
@@ -183,7 +141,6 @@ const WalletConnect: React.FC = () => {
     event.preventDefault();
 
     const { account: zkVerifyAccount } = walletState.zkVerify;
-    const { address: vflowAddress } = walletState.vflow;
 
     if ((teleportDirection === 'zkv-to-vflow' && !zkVerifyAccount) || (teleportDirection === 'vflow-to-zkv' && !vflowAddress)) {
       setModalMessage('Please connect both wallets and enter an amount.');
@@ -229,40 +186,40 @@ const WalletConnect: React.FC = () => {
         };
 
         const tx = api.tx.xcmPallet.teleportAssets(destination, beneficiary, assets, 0);
-        
+
         setModalMessage('Waiting for wallet signature...');
         const injector = await web3FromAddress(zkVerifyAccount!.address);
-        
+
         await new Promise<void>((resolve, reject) => {
           tx.signAndSend(zkVerifyAccount!.address, { signer: injector.signer }, ({ status, events, dispatchError }) => {
             setModalTxHash(tx.hash.toHex());
 
             if (status.isInBlock) {
-                if (dispatchError) {
-                    if (dispatchError.isModule) {
-                        const decoded = connectedApi.registry.findMetaError(dispatchError.asModule);
-                        const { docs, name, section } = decoded;
-                        reject(new Error(`Transaction Failed: ${section}.${name} - ${docs.join(' ')}`));
-                    } else {
-                        reject(new Error(`Transaction Failed: ${dispatchError.toString()}`));
-                    }
-                    return;
-                }
-
-                const successEvent = events.find(({ event }) => connectedApi.events.system.ExtrinsicSuccess.is(event));
-                if (successEvent) {
-                    setModalStatus('success');
-                    setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
-                    resolve();
+              if (dispatchError) {
+                if (dispatchError.isModule) {
+                  const decoded = connectedApi.registry.findMetaError(dispatchError.asModule);
+                  const { docs, name, section } = decoded;
+                  reject(new Error(`Transaction Failed: ${section}.${name} - ${docs.join(' ')}`));
                 } else {
-                    // Even if no specific success event is found, we can consider it successful 
-                    // once it's in a block without errors.
-                    setModalStatus('success');
-                    setModalMessage(<>Success! Transaction is in a block. <br /> Transaction hash:</>);
-                    resolve();
+                  reject(new Error(`Transaction Failed: ${dispatchError.toString()}`));
                 }
+                return;
+              }
+
+              const successEvent = events.find(({ event }) => connectedApi.events.system.ExtrinsicSuccess.is(event));
+              if (successEvent) {
+                setModalStatus('success');
+                setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
+                resolve();
+              } else {
+                // Even if no specific success event is found, we can consider it successful 
+                // once it's in a block without errors.
+                setModalStatus('success');
+                setModalMessage(<>Success! Transaction is in a block. <br /> Transaction hash:</>);
+                resolve();
+              }
             } else if (status.isInvalid) {
-                reject(new Error(`Transaction failed with status: ${status.type}`));
+              reject(new Error(`Transaction failed with status: ${status.type}`));
             } else {
               setModalMessage(`Transaction status: ${status.type}`);
             }
@@ -287,23 +244,23 @@ const WalletConnect: React.FC = () => {
     } else { // vflow-to-zkv
       try {
         await NetworkService.checkAndSwitchNetwork();
-        
-        const provider = getEthersProvider();
-        const signer = await provider.getSigner(vflowAddress);
-        
+
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+
         const destinationHex = ss58ToHex(zkVerifyAccount!.address);
 
         setModalMessage('Sending transaction to VFlow...');
         const tx = await VFlowWalletService.teleportToRelayChain(signer, destinationHex, amount);
-        
+
         setModalTxHash(tx.hash);
-        setModalMessage(<>Transaction sent. <br/> Waiting for confirmation...</>);
+        setModalMessage(<>Transaction sent. <br /> Waiting for confirmation...</>);
 
         await tx.wait();
 
         setModalStatus('success');
         setModalMessage(<>Success! Tokens have been teleported. <br /> Transaction hash:</>);
-        
+
         setTimeout(refreshBalances, 4000);
 
       } catch (error: any) {
@@ -323,7 +280,7 @@ const WalletConnect: React.FC = () => {
   };
 
   const getButton = () => {
-    if (!walletState.zkVerify.isConnected || !walletState.vflow.isConnected) {
+    if (!walletState.zkVerify.isConnected || !vflowIsConnected) {
       return <button type="button" disabled>Connect Wallets to Teleport</button>;
     }
     return <button type="submit" disabled={isLoading || !amount}>{isLoading ? 'Teleporting...' : 'Teleport'}</button>;
@@ -335,6 +292,8 @@ const WalletConnect: React.FC = () => {
       isConnected={walletState.zkVerify.isConnected}
       accounts={walletState.zkVerify.accounts}
       selectedAccount={walletState.zkVerify.account}
+      balance={walletState.zkVerify.balance}
+      tokenSymbol="tVFY"
       error={walletState.zkVerify.error}
       onConnect={connectToZkVerify}
       onDisconnect={() => handleDisconnect('zkVerify')}
@@ -343,28 +302,16 @@ const WalletConnect: React.FC = () => {
       onHelp={() => setIsZkVerifyHelpOpen(true)}
     />
   ) : (
-    <WalletPanel
+    <RainbowKitWalletPanel
       type="VFlow"
-      isConnected={walletState.vflow.isConnected}
-      address={walletState.vflow.address}
-      error={walletState.vflow.error}
-      onConnect={connectToVFlow}
-      onDisconnect={() => handleDisconnect('vflow')}
-      isLoading={isLoading}
-      onHelp={() => {}} // No help for VFlow
+      onHelp={() => { }} // No help for VFlow
     />
   );
 
   const toPanel = teleportDirection === 'zkv-to-vflow' ? (
-    <WalletPanel
+    <RainbowKitWalletPanel
       type="VFlow"
-      isConnected={walletState.vflow.isConnected}
-      address={walletState.vflow.address}
-      error={walletState.vflow.error}
-      onConnect={connectToVFlow}
-      onDisconnect={() => handleDisconnect('vflow')}
-      isLoading={isLoading}
-      onHelp={() => {}} // No help for VFlow
+      onHelp={() => { }} // No help for VFlow
     />
   ) : (
     <WalletPanel
@@ -372,6 +319,8 @@ const WalletConnect: React.FC = () => {
       isConnected={walletState.zkVerify.isConnected}
       accounts={walletState.zkVerify.accounts}
       selectedAccount={walletState.zkVerify.account}
+      balance={walletState.zkVerify.balance}
+      tokenSymbol="tVFY"
       error={walletState.zkVerify.error}
       onConnect={connectToZkVerify}
       onDisconnect={() => handleDisconnect('zkVerify')}
@@ -394,11 +343,11 @@ const WalletConnect: React.FC = () => {
         {toPanel}
       </div>
 
-      {(walletState.zkVerify.isConnected && walletState.vflow.isConnected) && (
+      {(walletState.zkVerify.isConnected && vflowIsConnected) && (
         <TeleportForm
           teleportDirection={teleportDirection}
           zkVerifyBalance={walletState.zkVerify.balance}
-          vflowBalance={walletState.vflow.balance}
+          vflowBalance={vflowBalanceData?.value?.toString() || '0'}
           amount={amount}
           onAmountChange={setAmount}
           onSubmit={handleTeleport}
@@ -406,7 +355,7 @@ const WalletConnect: React.FC = () => {
           getButton={getButton}
         />
       )}
-      
+
       <TransactionModal
         isOpen={isModalOpen}
         status={modalStatus}

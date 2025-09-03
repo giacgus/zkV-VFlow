@@ -9,6 +9,8 @@ interface WalletPanelProps {
   accounts?: InjectedAccountWithMeta[];
   selectedAccount?: InjectedAccountWithMeta | null;
   address?: string;
+  balance?: string;
+  tokenSymbol?: string;
   error: string;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -23,6 +25,8 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
   accounts,
   selectedAccount,
   address,
+  balance,
+  tokenSymbol,
   error,
   onConnect,
   onDisconnect,
@@ -32,6 +36,20 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
 }) => {
   const logo = type === 'zkVerify' ? zkVerifyLogo : vflowTempLogo;
   const name = type === 'zkVerify' ? 'zkVerify' : 'VFlow';
+
+  const formatBalance = (raw?: string) => {
+    if (!raw) return '0.0000';
+    try {
+      const value = BigInt(raw);
+      const decimals = 18;
+      const integerPart = value / BigInt(10 ** decimals);
+      const fractionalPart = value % BigInt(10 ** decimals);
+      const fractionalString = fractionalPart.toString().padStart(decimals, '0').substring(0, 4);
+      return `${integerPart}.${fractionalString}`;
+    } catch {
+      return '0.0000';
+    }
+  };
 
   return (
     <div className="panel">
@@ -51,6 +69,9 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
               ))}
             </select>
           )}
+          {type === 'zkVerify' && (
+            <div className="balance-display">Balance: {formatBalance(balance)} {tokenSymbol || 'tVFY'}</div>
+          )}
           {type === 'VFlow' && address && (
             <div className="address-display">
               {address.slice(0, 6)}...{address.slice(-4)}
@@ -64,7 +85,7 @@ const WalletPanel: React.FC<WalletPanelProps> = ({
           </div>
         </div>
       ) : (
-        <button onClick={onConnect} disabled={isLoading}>Connect Wallet</button>
+        <button className="substrate-connect" onClick={onConnect} disabled={isLoading}>Connect Wallet</button>
       )}
       {error && <p className="error-message">{error}</p>}
     </div>
